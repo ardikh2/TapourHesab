@@ -12,6 +12,7 @@ run = ["npm", "run", "start"]
 
 [env]
 PORT = "5000"
+DATABASE_URL = "postgresql://postgres:@localhost:5432/main"
 
 [workflows]
 runButton = "Project"
