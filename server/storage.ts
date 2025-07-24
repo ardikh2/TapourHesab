@@ -1,45 +1,27 @@
-import {
-  users,
-  customers,
-  products,
-  invoices,
-  invoiceItems,
-  type User,
-  type InsertUser,
-  type Customer,
-  type InsertCustomer,
-  type Product,
-  type InsertProduct,
-  type Invoice,
-  type InsertInvoice,
-  type InvoiceItem,
-  type InsertInvoiceItem,
-  type InvoiceWithDetails,
-  type ProductWithLowStock,
-} from "@shared/schema";
-import { db } from "./db";
-import { eq, desc, asc, like, and, gte, lte, sql } from "drizzle-orm";
+import { supabase } from "./db";
+import type {
+  Customer,
+  Product,
+  Invoice,
+  InvoiceItem,
+  InvoiceWithDetails,
+} from "../client/src/lib/supabase";
 
 export interface IStorage {
-  // Users
-  getUser(id: number): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
-
   // Customers
   getCustomers(search?: string): Promise<Customer[]>;
   getCustomer(id: number): Promise<Customer | undefined>;
-  createCustomer(customer: InsertCustomer): Promise<Customer>;
-  updateCustomer(id: number, customer: Partial<InsertCustomer>): Promise<Customer>;
+  createCustomer(customer: Omit<Customer, 'id' | 'created_at'>): Promise<Customer>;
+  updateCustomer(id: number, customer: Partial<Omit<Customer, 'id' | 'created_at'>>): Promise<Customer>;
   deleteCustomer(id: number): Promise<boolean>;
 
   // Products
   getProducts(search?: string): Promise<Product[]>;
   getProduct(id: number): Promise<Product | undefined>;
-  createProduct(product: InsertProduct): Promise<Product>;
-  updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product>;
+  createProduct(product: Omit<Product, 'id' | 'created_at'>): Promise<Product>;
+  updateProduct(id: number, product: Partial<Omit<Product, 'id' | 'created_at'>>): Promise<Product>;
   deleteProduct(id: number): Promise<boolean>;
-  getLowStockProducts(): Promise<ProductWithLowStock[]>;
+  getLowStockProducts(): Promise<Product[]>;
 
   // Invoices
   getInvoices(filters?: {
@@ -50,8 +32,8 @@ export interface IStorage {
     search?: string;
   }): Promise<InvoiceWithDetails[]>;
   getInvoice(id: number): Promise<InvoiceWithDetails | undefined>;
-  createInvoice(invoice: InsertInvoice, items: InsertInvoiceItem[]): Promise<InvoiceWithDetails>;
-  updateInvoice(id: number, invoice: Partial<InsertInvoice>, items?: InsertInvoiceItem[]): Promise<InvoiceWithDetails>;
+  createInvoice(invoice: Omit<Invoice, 'id' | 'invoice_number' | 'created_at' | 'updated_at'>, items: Omit<InvoiceItem, 'id' | 'invoice_id'>[]): Promise<InvoiceWithDetails>;
+  updateInvoice(id: number, invoice: Partial<Omit<Invoice, 'id' | 'invoice_number' | 'created_at' | 'updated_at'>>, items?: Omit<InvoiceItem, 'id' | 'invoice_id'>[]): Promise<InvoiceWithDetails>;
   deleteInvoice(id: number): Promise<boolean>;
   convertPreInvoiceToInvoice(id: number): Promise<InvoiceWithDetails>;
   getNextInvoiceNumber(): Promise<number>;
@@ -67,105 +49,128 @@ export interface IStorage {
   getTopProducts(limit?: number): Promise<Array<Product & { soldQuantity: number }>>;
 }
 
-export class DatabaseStorage implements IStorage {
-  async getUser(id: number): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user || undefined;
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user || undefined;
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
-    return user;
-  }
-
+export class SupabaseStorage implements IStorage {
   // Customers
   async getCustomers(search?: string): Promise<Customer[]> {
-    let query = db.select().from(customers);
+    let query = supabase.from('customers').select('*');
     
     if (search) {
-      query = query.where(
-        sql`${customers.firstName} || ' ' || ${customers.lastName} ILIKE ${`%${search}%`}`
-      );
+      query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%`);
     }
     
-    return await query.orderBy(asc(customers.firstName));
+    const { data, error } = await query.order('first_name');
+    if (error) throw error;
+    return data || [];
   }
 
   async getCustomer(id: number): Promise<Customer | undefined> {
-    const [customer] = await db.select().from(customers).where(eq(customers.id, id));
-    return customer || undefined;
+    const { data, error } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') throw error;
+    return data || undefined;
   }
 
-  async createCustomer(customer: InsertCustomer): Promise<Customer> {
-    const [newCustomer] = await db.insert(customers).values(customer).returning();
-    return newCustomer;
+  async createCustomer(customer: Omit<Customer, 'id' | 'created_at'>): Promise<Customer> {
+    const { data, error } = await supabase
+      .from('customers')
+      .insert(customer)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
   }
 
-  async updateCustomer(id: number, customer: Partial<InsertCustomer>): Promise<Customer> {
-    const [updatedCustomer] = await db
-      .update(customers)
-      .set(customer)
-      .where(eq(customers.id, id))
-      .returning();
-    return updatedCustomer;
+  async updateCustomer(id: number, customer: Partial<Omit<Customer, 'id' | 'created_at'>>): Promise<Customer> {
+    const { data, error } = await supabase
+      .from('customers')
+      .update(customer)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
   }
 
   async deleteCustomer(id: number): Promise<boolean> {
-    const result = await db.delete(customers).where(eq(customers.id, id));
-    return (result.rowCount || 0) > 0;
+    const { error } = await supabase
+      .from('customers')
+      .delete()
+      .eq('id', id);
+    
+    return !error;
   }
 
   // Products
   async getProducts(search?: string): Promise<Product[]> {
-    let query = db.select().from(products);
+    let query = supabase.from('products').select('*');
     
     if (search) {
-      query = query.where(like(products.name, `%${search}%`));
+      query = query.ilike('name', `%${search}%`);
     }
     
-    return await query.orderBy(asc(products.name));
+    const { data, error } = await query.order('name');
+    if (error) throw error;
+    return data || [];
   }
 
   async getProduct(id: number): Promise<Product | undefined> {
-    const [product] = await db.select().from(products).where(eq(products.id, id));
-    return product || undefined;
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') throw error;
+    return data || undefined;
   }
 
-  async createProduct(product: InsertProduct): Promise<Product> {
-    const [newProduct] = await db.insert(products).values(product).returning();
-    return newProduct;
+  async createProduct(product: Omit<Product, 'id' | 'created_at'>): Promise<Product> {
+    const { data, error } = await supabase
+      .from('products')
+      .insert(product)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
   }
 
-  async updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product> {
-    const [updatedProduct] = await db
-      .update(products)
-      .set(product)
-      .where(eq(products.id, id))
-      .returning();
-    return updatedProduct;
+  async updateProduct(id: number, product: Partial<Omit<Product, 'id' | 'created_at'>>): Promise<Product> {
+    const { data, error } = await supabase
+      .from('products')
+      .update(product)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
   }
 
   async deleteProduct(id: number): Promise<boolean> {
-    const result = await db.delete(products).where(eq(products.id, id));
-    return (result.rowCount || 0) > 0;
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', id);
+    
+    return !error;
   }
 
-  async getLowStockProducts(): Promise<ProductWithLowStock[]> {
-    const lowStockProducts = await db
-      .select()
-      .from(products)
-      .where(sql`${products.quantity} < 5`)
-      .orderBy(asc(products.quantity));
+  async getLowStockProducts(): Promise<Product[]> {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .lt('quantity', 5)
+      .order('quantity');
     
-    return lowStockProducts.map(product => ({
-      ...product,
-      isLowStock: true,
-    }));
+    if (error) throw error;
+    return data || [];
   }
 
   // Invoices
@@ -176,149 +181,159 @@ export class DatabaseStorage implements IStorage {
     endDate?: string;
     search?: string;
   }): Promise<InvoiceWithDetails[]> {
-    let query = db
-      .select()
-      .from(invoices)
-      .leftJoin(customers, eq(invoices.customerId, customers.id));
+    let query = supabase
+      .from('invoices')
+      .select(`
+        *,
+        customer:customers(*),
+        items:invoice_items(
+          *,
+          product:products(*)
+        )
+      `);
 
-    const conditions = [];
-    
     if (filters?.type) {
-      conditions.push(eq(invoices.type, filters.type));
+      query = query.eq('type', filters.type);
     }
     
     if (filters?.customerId) {
-      conditions.push(eq(invoices.customerId, filters.customerId));
+      query = query.eq('customer_id', filters.customerId);
     }
     
     if (filters?.startDate) {
-      conditions.push(gte(invoices.createdAt, new Date(filters.startDate)));
+      query = query.gte('created_at', filters.startDate);
     }
     
     if (filters?.endDate) {
-      conditions.push(lte(invoices.createdAt, new Date(filters.endDate)));
+      query = query.lte('created_at', filters.endDate);
     }
     
     if (filters?.search) {
-      conditions.push(
-        sql`${invoices.invoiceNumber}::text ILIKE ${`%${filters.search}%`}`
-      );
-    }
-    
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
+      query = query.ilike('invoice_number', `%${filters.search}%`);
     }
 
-    const result = await query.orderBy(desc(invoices.createdAt));
+    const { data, error } = await query.order('created_at', { ascending: false });
+    if (error) throw error;
     
-    // Get items for each invoice
-    const invoicesWithDetails: InvoiceWithDetails[] = [];
-    
-    for (const row of result) {
-      const items = await db
-        .select()
-        .from(invoiceItems)
-        .leftJoin(products, eq(invoiceItems.productId, products.id))
-        .where(eq(invoiceItems.invoiceId, row.invoices.id));
-      
-      invoicesWithDetails.push({
-        ...row.invoices,
-        customer: row.customers!,
-        items: items.map(item => ({
-          ...item.invoice_items,
-          product: item.products!,
-        })),
-      });
-    }
-    
-    return invoicesWithDetails;
+    return (data || []).map(invoice => ({
+      ...invoice,
+      customer: invoice.customer,
+      items: invoice.items || []
+    }));
   }
 
   async getInvoice(id: number): Promise<InvoiceWithDetails | undefined> {
-    const [invoice] = await db
-      .select()
-      .from(invoices)
-      .leftJoin(customers, eq(invoices.customerId, customers.id))
-      .where(eq(invoices.id, id));
+    const { data, error } = await supabase
+      .from('invoices')
+      .select(`
+        *,
+        customer:customers(*),
+        items:invoice_items(
+          *,
+          product:products(*)
+        )
+      `)
+      .eq('id', id)
+      .single();
     
-    if (!invoice) return undefined;
-    
-    const items = await db
-      .select()
-      .from(invoiceItems)
-      .leftJoin(products, eq(invoiceItems.productId, products.id))
-      .where(eq(invoiceItems.invoiceId, id));
+    if (error && error.code !== 'PGRST116') throw error;
+    if (!data) return undefined;
     
     return {
-      ...invoice.invoices,
-      customer: invoice.customers!,
-      items: items.map(item => ({
-        ...item.invoice_items,
-        product: item.products!,
-      })),
+      ...data,
+      customer: data.customer,
+      items: data.items || []
     };
   }
 
-  async createInvoice(invoice: InsertInvoice, items: InsertInvoiceItem[]): Promise<InvoiceWithDetails> {
+  async createInvoice(invoice: Omit<Invoice, 'id' | 'invoice_number' | 'created_at' | 'updated_at'>, items: Omit<InvoiceItem, 'id' | 'invoice_id'>[]): Promise<InvoiceWithDetails> {
     const invoiceNumber = await this.getNextInvoiceNumber();
     
-    const [newInvoice] = await db
-      .insert(invoices)
-      .values({ ...invoice, invoiceNumber })
-      .returning();
+    const { data: newInvoice, error: invoiceError } = await supabase
+      .from('invoices')
+      .insert({ ...invoice, invoice_number: invoiceNumber })
+      .select()
+      .single();
+    
+    if (invoiceError) throw invoiceError;
     
     // Insert items
     if (items && items.length > 0) {
       const invoiceItemsWithId = items.map(item => ({
         ...item,
-        invoiceId: newInvoice.id,
+        invoice_id: newInvoice.id,
       }));
       
-      await db.insert(invoiceItems).values(invoiceItemsWithId);
+      const { error: itemsError } = await supabase
+        .from('invoice_items')
+        .insert(invoiceItemsWithId);
+      
+      if (itemsError) throw itemsError;
       
       // Update product quantities if this is a final invoice
       if (invoice.type === 'invoice') {
         for (const item of items) {
-          await db
-            .update(products)
-            .set({
-              quantity: sql`${products.quantity} - ${item.quantity}`,
-            })
-            .where(eq(products.id, item.productId));
+          const { error: updateError } = await supabase.rpc('update_product_quantity', {
+            product_id: item.product_id,
+            quantity_change: -item.quantity
+          });
+          
+          if (updateError) throw updateError;
         }
       }
     }
     
-    return (await this.getInvoice(newInvoice.id))!;
+    const result = await this.getInvoice(newInvoice.id);
+    if (!result) throw new Error('Failed to retrieve created invoice');
+    return result;
   }
 
-  async updateInvoice(id: number, invoice: Partial<InsertInvoice>, items?: InsertInvoiceItem[]): Promise<InvoiceWithDetails> {
-    const [updatedInvoice] = await db
-      .update(invoices)
-      .set({ ...invoice, updatedAt: new Date() })
-      .where(eq(invoices.id, id))
-      .returning();
+  async updateInvoice(id: number, invoice: Partial<Omit<Invoice, 'id' | 'invoice_number' | 'created_at' | 'updated_at'>>, items?: Omit<InvoiceItem, 'id' | 'invoice_id'>[]): Promise<InvoiceWithDetails> {
+    const { data: updatedInvoice, error: invoiceError } = await supabase
+      .from('invoices')
+      .update({ ...invoice, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (invoiceError) throw invoiceError;
     
     if (items) {
       // Delete existing items
-      await db.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id));
+      await supabase.from('invoice_items').delete().eq('invoice_id', id);
       
       // Insert new items
       const invoiceItemsWithId = items.map(item => ({
         ...item,
-        invoiceId: id,
+        invoice_id: id,
       }));
       
-      await db.insert(invoiceItems).values(invoiceItemsWithId);
+      const { error: itemsError } = await supabase
+        .from('invoice_items')
+        .insert(invoiceItemsWithId);
+      
+      if (itemsError) throw itemsError;
     }
     
-    return (await this.getInvoice(id))!;
+    const result = await this.getInvoice(id);
+    if (!result) throw new Error('Failed to retrieve updated invoice');
+    return result;
   }
 
   async deleteInvoice(id: number): Promise<boolean> {
-    await db.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id));
-    const result = await db.delete(invoices).where(eq(invoices.id, id));
-    return (result.rowCount || 0) > 0;
+    const { error: itemsError } = await supabase
+      .from('invoice_items')
+      .delete()
+      .eq('invoice_id', id);
+    
+    if (itemsError) return false;
+    
+    const { error: invoiceError } = await supabase
+      .from('invoices')
+      .delete()
+      .eq('id', id);
+    
+    return !invoiceError;
   }
 
   async convertPreInvoiceToInvoice(id: number): Promise<InvoiceWithDetails> {
@@ -328,36 +343,41 @@ export class DatabaseStorage implements IStorage {
     }
     
     // Update invoice type and status
-    await db
-      .update(invoices)
-      .set({ 
+    const { error: updateError } = await supabase
+      .from('invoices')
+      .update({ 
         type: 'invoice', 
         status: 'final',
-        updatedAt: new Date() 
+        updated_at: new Date().toISOString()
       })
-      .where(eq(invoices.id, id));
+      .eq('id', id);
+    
+    if (updateError) throw updateError;
     
     // Update product quantities
     for (const item of preInvoice.items) {
-      await db
-        .update(products)
-        .set({
-          quantity: sql`${products.quantity} - ${item.quantity}`,
-        })
-        .where(eq(products.id, item.productId));
+      const { error: quantityError } = await supabase.rpc('update_product_quantity', {
+        product_id: item.product_id,
+        quantity_change: -item.quantity
+      });
+      
+      if (quantityError) throw quantityError;
     }
     
-    return (await this.getInvoice(id))!;
+    const result = await this.getInvoice(id);
+    if (!result) throw new Error('Failed to retrieve converted invoice');
+    return result;
   }
 
   async getNextInvoiceNumber(): Promise<number> {
-    const [lastInvoice] = await db
-      .select({ invoiceNumber: invoices.invoiceNumber })
-      .from(invoices)
-      .orderBy(desc(invoices.invoiceNumber))
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('invoice_number')
+      .order('invoice_number', { ascending: false })
       .limit(1);
     
-    return lastInvoice ? lastInvoice.invoiceNumber + 1 : 1001;
+    if (error) throw error;
+    return data && data.length > 0 ? data[0].invoice_number + 1 : 1001;
   }
 
   // Analytics
@@ -375,46 +395,40 @@ export class DatabaseStorage implements IStorage {
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     
     // Today's sales
-    const [todaySalesResult] = await db
-      .select({
-        total: sql<string>`COALESCE(SUM(${invoices.total}), 0)`,
-        count: sql<number>`COUNT(*)`,
-      })
-      .from(invoices)
-      .where(
-        and(
-          eq(invoices.type, 'invoice'),
-          gte(invoices.createdAt, today),
-          sql`${invoices.createdAt} < ${tomorrow}`
-        )
-      );
+    const { data: todayData, error: todayError } = await supabase
+      .from('invoices')
+      .select('total')
+      .eq('type', 'invoice')
+      .gte('created_at', today.toISOString())
+      .lt('created_at', tomorrow.toISOString());
+    
+    if (todayError) throw todayError;
     
     // Month's sales
-    const [monthSalesResult] = await db
-      .select({
-        total: sql<string>`COALESCE(SUM(${invoices.total}), 0)`,
-      })
-      .from(invoices)
-      .where(
-        and(
-          eq(invoices.type, 'invoice'),
-          gte(invoices.createdAt, startOfMonth)
-        )
-      );
+    const { data: monthData, error: monthError } = await supabase
+      .from('invoices')
+      .select('total')
+      .eq('type', 'invoice')
+      .gte('created_at', startOfMonth.toISOString());
+    
+    if (monthError) throw monthError;
     
     // Low stock count
-    const [lowStockResult] = await db
-      .select({
-        count: sql<number>`COUNT(*)`,
-      })
-      .from(products)
-      .where(sql`${products.quantity} < 5`);
+    const { count: lowStockCount, error: stockError } = await supabase
+      .from('products')
+      .select('*', { count: 'exact', head: true })
+      .lt('quantity', 5);
+    
+    if (stockError) throw stockError;
+    
+    const todaySales = (todayData || []).reduce((sum, inv) => sum + parseFloat(inv.total.toString()), 0);
+    const monthSales = (monthData || []).reduce((sum, inv) => sum + parseFloat(inv.total.toString()), 0);
     
     return {
-      todaySales: todaySalesResult.total || '0',
-      todayInvoices: todaySalesResult.count || 0,
-      monthSales: monthSalesResult.total || '0',
-      lowStockCount: lowStockResult.count || 0,
+      todaySales: todaySales.toString(),
+      todayInvoices: (todayData || []).length,
+      monthSales: monthSales.toString(),
+      lowStockCount: lowStockCount || 0,
     };
   }
 
@@ -423,29 +437,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTopProducts(limit = 5): Promise<Array<Product & { soldQuantity: number }>> {
-    const result = await db
-      .select({
-        id: products.id,
-        name: products.name,
-        quantity: products.quantity,
-        purchasePrice: products.purchasePrice,
-        salePrice: products.salePrice,
-        description: products.description,
-        createdAt: products.createdAt,
-        soldQuantity: sql<number>`COALESCE(SUM(${invoiceItems.quantity}), 0)`,
-      })
-      .from(products)
-      .leftJoin(invoiceItems, eq(products.id, invoiceItems.productId))
-      .leftJoin(invoices, and(
-        eq(invoiceItems.invoiceId, invoices.id),
-        eq(invoices.type, 'invoice')
-      ))
-      .groupBy(products.id)
-      .orderBy(desc(sql`COALESCE(SUM(${invoiceItems.quantity}), 0)`))
-      .limit(limit);
+    const { data, error } = await supabase.rpc('get_top_products', { limit_count: limit });
     
-    return result;
+    if (error) throw error;
+    return data || [];
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = new SupabaseStorage();

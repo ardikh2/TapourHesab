@@ -1,8 +1,43 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCustomerSchema, insertProductSchema, insertInvoiceSchema, insertInvoiceItemSchema } from "@shared/schema";
 import { z } from "zod";
+
+// Validation schemas
+const customerSchema = z.object({
+  first_name: z.string().min(1, "نام الزامی است"),
+  last_name: z.string().min(1, "نام خانوادگی الزامی است"),
+  address: z.string().optional(),
+  phone: z.string().optional(),
+  national_id: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+const productSchema = z.object({
+  name: z.string().min(1, "نام کالا الزامی است"),
+  quantity: z.number().min(0, "تعداد نمی‌تواند منفی باشد"),
+  purchase_price: z.number().optional(),
+  sale_price: z.number().min(0, "قیمت فروش الزامی است"),
+  description: z.string().optional(),
+});
+
+const invoiceSchema = z.object({
+  customer_id: z.number(),
+  type: z.enum(['invoice', 'pre-invoice']),
+  subtotal: z.number(),
+  discount_type: z.enum(['percent', 'amount']).default('percent'),
+  discount_value: z.number().default(0),
+  discount_amount: z.number().default(0),
+  total: z.number(),
+  status: z.enum(['draft', 'final']).default('draft'),
+});
+
+const invoiceItemSchema = z.object({
+  product_id: z.number(),
+  quantity: z.number(),
+  price: z.number(),
+  total: z.number(),
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Customers
@@ -31,7 +66,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/customers", async (req, res) => {
     try {
-      const customerData = insertCustomerSchema.parse(req.body);
+      const customerData = customerSchema.parse(req.body);
       const customer = await storage.createCustomer(customerData);
       res.status(201).json(customer);
     } catch (error) {
@@ -45,7 +80,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/customers/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const customerData = insertCustomerSchema.partial().parse(req.body);
+      const customerData = customerSchema.partial().parse(req.body);
       const customer = await storage.updateCustomer(id, customerData);
       res.json(customer);
     } catch (error) {
@@ -104,7 +139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/products", async (req, res) => {
     try {
-      const productData = insertProductSchema.parse(req.body);
+      const productData = productSchema.parse(req.body);
       const product = await storage.createProduct(productData);
       res.status(201).json(product);
     } catch (error) {
@@ -118,7 +153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/products/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const productData = insertProductSchema.partial().parse(req.body);
+      const productData = productSchema.partial().parse(req.body);
       const product = await storage.updateProduct(id, productData);
       res.json(product);
     } catch (error) {
@@ -172,16 +207,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  const createInvoiceItemSchema = z.object({
-    productId: z.number(),
-    quantity: z.number(),
-    price: z.string(),
-    total: z.string(),
-  });
-
   const createInvoiceSchema = z.object({
-    invoice: insertInvoiceSchema,
-    items: z.array(createInvoiceItemSchema),
+    invoice: invoiceSchema,
+    items: z.array(invoiceItemSchema),
   });
 
   app.post("/api/invoices", async (req, res) => {
