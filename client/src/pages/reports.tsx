@@ -30,7 +30,7 @@ export default function Reports() {
   const [reportType, setReportType] = useState("sales");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [filterCustomer, setFilterCustomer] = useState("");
+  const [filterCustomer, setFilterCustomer] = useState("all");
 
   const { toast } = useToast();
 
@@ -46,7 +46,7 @@ export default function Reports() {
       const params = new URLSearchParams({
         ...(startDate && { startDate }),
         ...(endDate && { endDate }),
-        ...(filterCustomer && { customerId: filterCustomer }),
+        ...(filterCustomer && filterCustomer !== "all" && { customerId: filterCustomer }),
       });
       
       const response = await fetch(`/api/invoices?${params}`);
@@ -79,8 +79,8 @@ export default function Reports() {
   });
 
   const handleExportInvoices = () => {
-    if (invoices?.length) {
-      exportInvoicesToExcel(invoices);
+    if ((invoices || []).length) {
+      exportInvoicesToExcel(invoices || []);
       toast({
         title: "موفق",
         description: "گزارش فاکتورها با موفقیت دانلود شد",
@@ -89,8 +89,8 @@ export default function Reports() {
   };
 
   const handleExportCustomers = () => {
-    if (customers?.length) {
-      exportCustomersToExcel(customers);
+    if ((customers || []).length) {
+      exportCustomersToExcel(customers || []);
       toast({
         title: "موفق",
         description: "گزارش مشتریان با موفقیت دانلود شد",
@@ -99,8 +99,8 @@ export default function Reports() {
   };
 
   const handleExportProducts = () => {
-    if (products?.length) {
-      exportProductsToExcel(products);
+    if ((products || []).length) {
+      exportProductsToExcel(products || []);
       toast({
         title: "موفق",
         description: "گزارش کالاها با موفقیت دانلود شد",
@@ -111,7 +111,7 @@ export default function Reports() {
   const clearFilters = () => {
     setStartDate("");
     setEndDate("");
-    setFilterCustomer("");
+    setFilterCustomer("all");
   };
 
   // Calculate sales statistics
@@ -169,8 +169,8 @@ export default function Reports() {
                     <SelectValue placeholder="انتخاب مشتری" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">همه مشتریان</SelectItem>
-                    {customers?.map((customer: any) => (
+                    <SelectItem value="all">همه مشتریان</SelectItem>
+                    {(customers || []).map((customer: any) => (
                       <SelectItem key={customer.id} value={customer.id.toString()}>
                         {customer.firstName} {customer.lastName}
                       </SelectItem>
@@ -200,7 +200,7 @@ export default function Reports() {
                 <div>
                   <p className="text-sm font-medium text-gray-500">کل فروش</p>
                   <p className="text-2xl font-bold text-primary">
-                    {salesStats ? formatPrice(salesStats.totalSales) : formatPrice(dashboardStats?.monthSales || 0)}
+                    {salesStats ? formatPrice(salesStats.totalSales) : formatPrice((dashboardStats as any)?.monthSales || 0)}
                   </p>
                   <p className="text-sm text-gray-500">تومان</p>
                 </div>
@@ -217,7 +217,7 @@ export default function Reports() {
                 <div>
                   <p className="text-sm font-medium text-gray-500">تعداد فاکتورها</p>
                   <p className="text-2xl font-bold text-secondary">
-                    {salesStats ? formatNumber(salesStats.totalInvoices) : formatNumber(dashboardStats?.todayInvoices || 0)}
+                    {salesStats ? formatNumber(salesStats.totalInvoices) : formatNumber((dashboardStats as any)?.todayInvoices || 0)}
                   </p>
                   <p className="text-sm text-gray-500">فقره</p>
                 </div>
@@ -234,7 +234,7 @@ export default function Reports() {
                 <div>
                   <p className="text-sm font-medium text-gray-500">تعداد مشتریان</p>
                   <p className="text-2xl font-bold text-success">
-                    {formatNumber(customers?.length || 0)}
+                    {formatNumber((customers || []).length || 0)}
                   </p>
                   <p className="text-sm text-gray-500">نفر</p>
                 </div>
@@ -251,7 +251,7 @@ export default function Reports() {
                 <div>
                   <p className="text-sm font-medium text-gray-500">کالاهای کم موجود</p>
                   <p className="text-2xl font-bold text-warning">
-                    {formatNumber(lowStockProducts?.length || 0)}
+                    {formatNumber((lowStockProducts || []).length || 0)}
                   </p>
                   <p className="text-sm text-gray-500">قلم</p>
                 </div>
@@ -371,7 +371,7 @@ export default function Reports() {
                   <Package size={20} />
                   گزارش کالاها
                 </CardTitle>
-                <Button onClick={handleExportProducts} disabled={!products?.length}>
+                <Button onClick={handleExportProducts} disabled={!(products || []).length}>
                   <Download size={16} className="ml-2" />
                   خروجی Excel
                 </Button>
@@ -393,7 +393,7 @@ export default function Reports() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {topProducts?.map((product: any, index: number) => (
+                        {(topProducts || []).map((product: any, index: number) => (
                           <TableRow key={product.id}>
                             <TableCell>
                               <span className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold text-white ${
@@ -431,7 +431,7 @@ export default function Reports() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {lowStockProducts?.map((product: any) => (
+                        {(lowStockProducts || []).map((product: any) => (
                           <TableRow key={product.id}>
                             <TableCell className="font-medium">{product.name}</TableCell>
                             <TableCell>{formatNumber(product.quantity)} عدد</TableCell>
@@ -467,7 +467,7 @@ export default function Reports() {
                   <Users size={20} />
                   گزارش مشتریان
                 </CardTitle>
-                <Button onClick={handleExportCustomers} disabled={!customers?.length}>
+                <Button onClick={handleExportCustomers} disabled={!(customers || []).length}>
                   <Download size={16} className="ml-2" />
                   خروجی Excel
                 </Button>

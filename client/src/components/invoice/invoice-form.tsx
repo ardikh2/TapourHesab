@@ -102,7 +102,7 @@ export default function InvoiceForm({ open, onClose, type, editData }: InvoiceFo
       return;
     }
 
-    const product = products?.find((p: any) => p.id.toString() === newItem.productId);
+    const product = (products || []).find((p: any) => p.id.toString() === newItem.productId);
     if (!product) return;
 
     const quantity = parseInt(newItem.quantity);
@@ -204,7 +204,7 @@ export default function InvoiceForm({ open, onClose, type, editData }: InvoiceFo
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {customers?.map((customer: any) => (
+                        {(customers || []).map((customer: any) => (
                           <SelectItem key={customer.id} value={customer.id.toString()}>
                             {customer.firstName} {customer.lastName}
                           </SelectItem>
@@ -238,7 +238,7 @@ export default function InvoiceForm({ open, onClose, type, editData }: InvoiceFo
                       <SelectValue placeholder="انتخاب کالا..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {products?.map((product: any) => (
+                      {(products || []).map((product: any) => (
                         <SelectItem key={product.id} value={product.id.toString()}>
                           {product.name} - {formatPrice(product.salePrice)} تومان
                         </SelectItem>
@@ -254,7 +254,7 @@ export default function InvoiceForm({ open, onClose, type, editData }: InvoiceFo
                   <Input
                     value={
                       newItem.productId
-                        ? formatPrice(products?.find((p: any) => p.id.toString() === newItem.productId)?.salePrice || 0)
+                        ? formatPrice((products || []).find((p: any) => p.id.toString() === newItem.productId)?.salePrice || 0)
                         : ""
                     }
                     readOnly

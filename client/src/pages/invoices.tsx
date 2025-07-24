@@ -28,7 +28,7 @@ export default function Invoices() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterCustomer, setFilterCustomer] = useState("");
+  const [filterCustomer, setFilterCustomer] = useState("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
@@ -41,7 +41,7 @@ export default function Invoices() {
       const params = new URLSearchParams({
         type: "invoice",
         ...(searchTerm && { search: searchTerm }),
-        ...(filterCustomer && { customerId: filterCustomer }),
+        ...(filterCustomer && filterCustomer !== "all" && { customerId: filterCustomer }),
         ...(startDate && { startDate }),
         ...(endDate && { endDate }),
       });
@@ -147,7 +147,7 @@ export default function Invoices() {
                 <SelectValue placeholder="انتخاب مشتری" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">همه مشتریان</SelectItem>
+                <SelectItem value="all">همه مشتریان</SelectItem>
                 {customers?.map((customer: any) => (
                   <SelectItem key={customer.id} value={customer.id.toString()}>
                     {customer.firstName} {customer.lastName}
@@ -212,8 +212,8 @@ export default function Invoices() {
                     در حال بارگذاری...
                   </TableCell>
                 </TableRow>
-              ) : invoices?.length ? (
-                invoices.map((invoice: any) => (
+              ) : (invoices || []).length ? (
+                (invoices || []).map((invoice: any) => (
                   <TableRow key={invoice.id}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">

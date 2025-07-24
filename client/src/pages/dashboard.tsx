@@ -34,7 +34,7 @@ export default function Dashboard() {
   const statsCards = [
     {
       title: "فروش امروز",
-      value: stats ? formatPrice(stats.todaySales) : "0",
+      value: stats ? formatPrice(stats.todaySales || "0") : "0",
       unit: "تومان",
       icon: TrendingUp,
       color: "text-primary",
@@ -42,7 +42,7 @@ export default function Dashboard() {
     },
     {
       title: "فاکتورهای امروز",
-      value: stats ? formatNumber(stats.todayInvoices) : "0",
+      value: stats ? formatNumber(stats.todayInvoices || 0) : "0",
       unit: "فقره",
       icon: FileText,
       color: "text-secondary",
@@ -50,7 +50,7 @@ export default function Dashboard() {
     },
     {
       title: "کالاهای کم موجود",
-      value: stats ? formatNumber(stats.lowStockCount) : "0",
+      value: stats ? formatNumber(stats.lowStockCount || 0) : "0",
       unit: "قلم",
       icon: AlertTriangle,
       color: "text-warning",
@@ -58,7 +58,7 @@ export default function Dashboard() {
     },
     {
       title: "فروش این ماه",
-      value: stats ? formatPrice(stats.monthSales) : "0",
+      value: stats ? formatPrice(stats.monthSales || "0") : "0",
       unit: "تومان",
       icon: Calendar,
       color: "text-success",
@@ -124,7 +124,7 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {recentInvoices?.slice(0, 5).map((invoice: any) => (
+                  {(recentInvoices || []).slice(0, 5).map((invoice: any) => (
                     <div key={invoice.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div>
                         <p className="font-medium text-neutral">
@@ -144,7 +144,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                   ))}
-                  {(!recentInvoices || recentInvoices.length === 0) && (
+                  {(!recentInvoices || (recentInvoices || []).length === 0) && (
                     <p className="text-center text-gray-500 py-8">
                       هنوز فاکتوری صادر نشده است
                     </p>
@@ -177,7 +177,7 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {lowStockProducts?.map((product: any) => (
+                  {(lowStockProducts || []).map((product: any) => (
                     <div
                       key={product.id}
                       className={`flex items-center justify-between p-3 rounded-lg border ${
@@ -207,7 +207,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                   ))}
-                  {(!lowStockProducts || lowStockProducts.length === 0) && (
+                  {(!lowStockProducts || (lowStockProducts || []).length === 0) && (
                     <p className="text-center text-gray-500 py-8">
                       همه کالاها دارای موجودی کافی هستند
                     </p>
@@ -264,7 +264,7 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {topProducts?.map((product: any, index: number) => (
+                  {(topProducts || []).map((product: any, index: number) => (
                     <div key={product.id} className="flex items-center justify-between">
                       <div className="flex items-center">
                         <span
@@ -287,7 +287,7 @@ export default function Dashboard() {
                       </span>
                     </div>
                   ))}
-                  {(!topProducts || topProducts.length === 0) && (
+                  {(!topProducts || (topProducts || []).length === 0) && (
                     <p className="text-center text-gray-500 py-8">
                       هنوز فروشی انجام نشده است
                     </p>

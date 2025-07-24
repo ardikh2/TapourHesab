@@ -117,7 +117,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCustomer(id: number): Promise<boolean> {
     const result = await db.delete(customers).where(eq(customers.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount || 0) > 0;
   }
 
   // Products
@@ -152,7 +152,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProduct(id: number): Promise<boolean> {
     const result = await db.delete(products).where(eq(products.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount || 0) > 0;
   }
 
   async getLowStockProducts(): Promise<ProductWithLowStock[]> {
@@ -316,7 +316,7 @@ export class DatabaseStorage implements IStorage {
   async deleteInvoice(id: number): Promise<boolean> {
     await db.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id));
     const result = await db.delete(invoices).where(eq(invoices.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount || 0) > 0;
   }
 
   async convertPreInvoiceToInvoice(id: number): Promise<InvoiceWithDetails> {
