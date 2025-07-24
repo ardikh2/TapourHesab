@@ -172,21 +172,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  const createInvoiceItemSchema = z.object({
+    productId: z.number(),
+    quantity: z.number(),
+    price: z.string(),
+    total: z.string(),
+  });
+
   const createInvoiceSchema = z.object({
     invoice: insertInvoiceSchema,
-    items: z.array(insertInvoiceItemSchema),
+    items: z.array(createInvoiceItemSchema),
   });
 
   app.post("/api/invoices", async (req, res) => {
     try {
-      console.log("Received invoice creation request:", req.body);
       const { invoice, items } = createInvoiceSchema.parse(req.body);
-      console.log("Parsed data:", { invoice, items });
       const newInvoice = await storage.createInvoice(invoice, items);
-      console.log("Created invoice:", newInvoice);
       res.status(201).json(newInvoice);
     } catch (error) {
-      console.error("Error creating invoice:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "اطلاعات وارد شده نامعتبر است", errors: error.errors });
       }
