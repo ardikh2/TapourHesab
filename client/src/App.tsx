@@ -9,6 +9,7 @@ import Customers from "@/pages/customers";
 import Invoices from "@/pages/invoices";
 import PreInvoices from "@/pages/pre-invoices";
 import Reports from "@/pages/reports";
+import Backup from "@/pages/backup";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/layout/sidebar";
 
@@ -25,6 +26,7 @@ function Router() {
           <Route path="/invoices" component={Invoices} />
           <Route path="/pre-invoices" component={PreInvoices} />
           <Route path="/reports" component={Reports} />
+          <Route path="/backup" component={Backup} />
           <Route component={NotFound} />
         </Switch>
       </div>

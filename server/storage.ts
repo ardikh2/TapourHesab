@@ -260,34 +260,48 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createInvoice(invoice: InsertInvoice, items: InsertInvoiceItem[]): Promise<InvoiceWithDetails> {
-    const invoiceNumber = await this.getNextInvoiceNumber();
-    
-    const [newInvoice] = await db
-      .insert(invoices)
-      .values({ ...invoice, invoiceNumber })
-      .returning();
-    
-    // Insert items
-    const invoiceItemsWithId = items.map(item => ({
-      ...item,
-      invoiceId: newInvoice.id,
-    }));
-    
-    await db.insert(invoiceItems).values(invoiceItemsWithId);
-    
-    // Update product quantities if this is a final invoice
-    if (invoice.type === 'invoice') {
-      for (const item of items) {
-        await db
-          .update(products)
-          .set({
-            quantity: sql`${products.quantity} - ${item.quantity}`,
-          })
-          .where(eq(products.id, item.productId));
+    try {
+      console.log("Creating invoice with data:", { invoice, items });
+      const invoiceNumber = await this.getNextInvoiceNumber();
+      console.log("Generated invoice number:", invoiceNumber);
+      
+      const [newInvoice] = await db
+        .insert(invoices)
+        .values({ ...invoice, invoiceNumber })
+        .returning();
+      
+      console.log("Inserted invoice:", newInvoice);
+      
+      // Insert items
+      if (items && items.length > 0) {
+        const invoiceItemsWithId = items.map(item => ({
+          ...item,
+          invoiceId: newInvoice.id,
+        }));
+        
+        console.log("Inserting items:", invoiceItemsWithId);
+        await db.insert(invoiceItems).values(invoiceItemsWithId);
+        
+        // Update product quantities if this is a final invoice
+        if (invoice.type === 'invoice') {
+          for (const item of items) {
+            await db
+              .update(products)
+              .set({
+                quantity: sql`${products.quantity} - ${item.quantity}`,
+              })
+              .where(eq(products.id, item.productId));
+          }
+        }
       }
+      
+      const result = await this.getInvoice(newInvoice.id);
+      console.log("Final result:", result);
+      return result!;
+    } catch (error) {
+      console.error("Error in createInvoice:", error);
+      throw error;
     }
-    
-    return (await this.getInvoice(newInvoice.id))!;
   }
 
   async updateInvoice(id: number, invoice: Partial<InsertInvoice>, items?: InsertInvoiceItem[]): Promise<InvoiceWithDetails> {

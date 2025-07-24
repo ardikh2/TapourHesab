@@ -1,34 +1,96 @@
-export function getCurrentPersianDate(): string {
-  const now = new Date();
-  
-  // Simple Persian date conversion (approximation)
-  // In production, you'd use a proper library like moment-jalaali
-  const year = now.getFullYear() - 621;
-  const month = now.getMonth() + 1;
-  const day = now.getDate();
-  
-  return `${year}/${month.toString().padStart(2, '0')}/${day.toString().padStart(2, '0')}`;
-}
+import moment from "moment";
+import "moment/locale/fa";
 
-export function getCurrentPersianDateTime(): string {
-  const now = new Date();
-  const date = getCurrentPersianDate();
-  const time = now.toLocaleTimeString('fa-IR', { 
-    hour: '2-digit', 
-    minute: '2-digit',
-    hour12: false 
-  });
-  
-  return `${date} - ${time}`;
-}
+// تنظیم moment برای استفاده از تاریخ فارسی
+moment.locale('fa');
 
-export function formatPersianDate(date: Date | string): string {
+// Set default timezone to Tehran
+const tehranNow = () => {
+  return moment().utcOffset('+03:30'); // Tehran UTC+3:30
+};
+
+// تابع تبدیل تاریخ میلادی به شمسی (تقریبی)
+const convertToJalali = (date: Date) => {
+  const jYear = date.getFullYear() - 621;
+  const jMonth = date.getMonth() + 1;
+  const jDay = date.getDate();
+  return { jYear, jMonth, jDay };
+};
+
+export const formatPersianDate = (date?: Date | string) => {
+  if (!date) {
+    const now = tehranNow().toDate();
+    const { jYear, jMonth, jDay } = convertToJalali(now);
+    return `${jYear}/${jMonth.toString().padStart(2, '0')}/${jDay.toString().padStart(2, '0')}`;
+  }
+  
   const d = typeof date === 'string' ? new Date(date) : date;
+  const { jYear, jMonth, jDay } = convertToJalali(d);
+  return `${jYear}/${jMonth.toString().padStart(2, '0')}/${jDay.toString().padStart(2, '0')}`;
+};
+
+export const formatPersianDateTime = (date?: Date | string) => {
+  if (!date) {
+    const now = tehranNow();
+    const persianDate = formatPersianDate(now.toDate());
+    const time = now.format('HH:mm');
+    return `${persianDate} ${time}`;
+  }
   
-  // Simple Persian date conversion (approximation)
-  const year = d.getFullYear() - 621;
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
-  
-  return `${year}/${month.toString().padStart(2, '0')}/${day.toString().padStart(2, '0')}`;
-}
+  const momentDate = moment(date).utcOffset('+03:30');
+  const persianDate = formatPersianDate(momentDate.toDate());
+  const time = momentDate.format('HH:mm');
+  return `${persianDate} ${time}`;
+};
+
+export const formatPersianTime = (date?: Date | string) => {
+  if (!date) return tehranNow().format('HH:mm:ss');
+  const momentDate = moment(date).utcOffset('+03:30');
+  return momentDate.format('HH:mm:ss');
+};
+
+export const getPersianToday = () => {
+  const now = tehranNow().toDate();
+  return formatPersianDate(now);
+};
+
+export const getPersianNow = () => {
+  return tehranNow().toDate();
+};
+
+export const convertPersianToGregorian = (persianDate: string) => {
+  // تبدیل ساده تاریخ شمسی به میلادی (تقریبی)
+  const [year, month, day] = persianDate.split('/').map(Number);
+  return new Date(year + 621, month - 1, day);
+};
+
+export const formatNumber = (num: number) => {
+  return num.toLocaleString('fa-IR');
+};
+
+export const formatPrice = (price: number) => {
+  return price.toLocaleString('fa-IR');
+};
+
+export const getCurrentPersianDateTime = () => {
+  const now = tehranNow();
+  const persianDate = formatPersianDate(now.toDate());
+  const time = now.format('HH:mm:ss');
+  return `${persianDate} ${time}`;
+};
+
+export const getCurrentTehranTime = () => {
+  return tehranNow().toDate();
+};
+
+export const getCurrentPersianDate = () => {
+  return formatPersianDate();
+};
+
+// برای استفاده در فرم‌ها
+export const formatPersianDateForInput = (date?: Date | string) => {
+  if (!date) return '';
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const { jYear, jMonth, jDay } = convertToJalali(d);
+  return `${jYear}-${jMonth.toString().padStart(2, '0')}-${jDay.toString().padStart(2, '0')}`;
+};

@@ -8,6 +8,7 @@ import {
   FileText, 
   FileEdit, 
   BarChart3,
+  Database,
   User
 } from "lucide-react";
 
@@ -18,6 +19,7 @@ const navigation = [
   { name: "صدور فاکتور", href: "/invoices", icon: FileText },
   { name: "پیش‌فاکتور", href: "/pre-invoices", icon: FileEdit },
   { name: "گزارش‌گیری", href: "/reports", icon: BarChart3 },
+  { name: "پشتیبان‌گیری", href: "/backup", icon: Database },
 ];
 
 export default function Sidebar() {
